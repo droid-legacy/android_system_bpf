@@ -150,18 +150,20 @@ int main(int __unused argc, char** argv, char * const envp[]) {
     // Load all ELF objects, create programs and maps, and pin them
     for (const auto& location : locations) {
         if (createSysFsBpfSubDir(location.prefix) || loadAllElfObjects(location)) {
-            ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS FROM %s ===", location.dir);
-            ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
-            ALOGE("If this triggers randomly, you might be hitting some memory allocation "
-                  "problems or startup script race.");
-            ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-            sleep(20);
-            return 120;
+            goto fail;
         }
     }
 
     const char * args[] = { "/apex/com.android.tethering/bin/netbpfload", "done", NULL, };
     execve(args[0], (char**)args, envp);
     ALOGE("FATAL: execve(): %d[%s]", errno, strerror(errno));
-    return 121;
+
+    return 0;
+fail:
+    ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS ===");
+    ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
+    ALOGE("If this triggers randomly, you might be hitting some memory allocation "
+            "problems or startup script race.");
+    ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
+    android::base::SetProperty("bpf.progs_loaded", "1");
 }
